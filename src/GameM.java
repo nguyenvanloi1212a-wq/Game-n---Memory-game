@@ -4,106 +4,166 @@ import java.awt.event.*;
 import java.util.*;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
+import java.io.*; 
 
 public class GameM extends JFrame {
 
-    // --- CẤU HÌNH CHUNG ---
-    private JPanel mainPanel; // Panel chính chứa các màn hình (CardLayout)
+    // --- CAU HINH HE THONG ---
+    private JPanel mainPanel; 
     private CardLayout cardLayout;
     
-    // Các màn hình con
+    // Cac man hinh con
     private JPanel menuPanel;
     private JPanel gamePanel;
     private JPanel instructPanel;
 
-    // --- BIẾN GAMEPLAY ---
-    private JPanel boardPanel; // Bàn cờ chứa các nút
-    private JLabel lblTime, lblScore;
+    // --- BIEN GAMEPLAY ---
+    private JPanel boardPanel; 
+    private JLabel lblTime, lblScore, lblHighScore; 
     private int rows, cols;
     private JButton[] buttons;
     private String[] hiddenValues;
     private Timer gameTimer, flipTimer;
-    private int seconds = 0, errors = 0, matchesFound = 0, totalPairs = 0;
     
-    // Trạng thái lật bài
+    // Bien tinh diem
+    private int seconds = 0;
+    private int errors = 0;
+    private int currentScore = 0; 
+    private int matchesFound = 0;
+    private int totalPairs = 0;
+    
+    // --- BIEN LUU TRU FILE ---
+    private int highScore = 0; 
+    private final String FILE_NAME = System.getProperty("user.home") + "/Desktop/highscore.txt";
+    
+    // Trang thai lat bai
     private JButton firstBtn = null;
     private int firstIndex = -1;
     private boolean isProcessing = false;
 
-    // Bộ icon (Unicode) cho game
+    // Bo icon
     private final String[] icons = {
-        "\u2605", "\u2665", "\u2663", "\u2666", // Sao, Tim, Chuon, Ro
-        "\u265A", "\u265E", "\u262F", "\u2602", // Vua, Ma, AmDuong, O
-        "\u260E", "\u2708", "\u266B", "\u2600", // DienThoai, MayBay, Nhac, MatTroi
-        "\u2744", "\u2622", "\u2693", "\u2654", // Tuyet, PhongXa, MoNeo, Hau
-        "\u26BD", "\u26BE", "\u26F3", "\u26F5"  // BongDa, BongChay, CoLop, Thuyen
+        "\u2605", "\u2665", "\u2663", "\u2666", 
+        "\u265A", "\u265E", "\u262F", "\u2602", 
+        "\u260E", "\u2708", "\u266B", "\u2600", 
+        "\u2744", "\u2622", "\u2693", "\u2654", 
+        "\u26BD", "\u26BE", "\u26F3", "\u26F5"  
     };
 
     public GameM() {
         super("Game Lật Hình - Memory Game");
-        setSize(700, 600);
+        setSize(850, 650); 
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        // Sử dụng CardLayout để chuyển đổi giữa Menu, Game, Hướng dẫn
+        // Kiem tra file
+        File f = new File(FILE_NAME);
+        System.out.println(">> FILE DIEM NAM O DAY: " + f.getAbsolutePath());
+
+        loadHighScore();
+
+        // KHOI TAO LAYOUT
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
-
-        // Khởi tạo các màn hình
-        createMenuScreen();
-        createInstructionScreen();
-        // Game screen sẽ được tạo lại mỗi khi bấm Start
+        
+        menuPanel = new JPanel();
+        instructPanel = new JPanel();
+        gamePanel = new JPanel();
 
         mainPanel.add(menuPanel, "MENU");
         mainPanel.add(instructPanel, "INSTRUCT");
+        mainPanel.add(gamePanel, "GAME");
 
         add(mainPanel);
-        cardLayout.show(mainPanel, "MENU"); // Hiện menu đầu tiên
+
+        // XAY DUNG GIAO DIEN
+        createMenuScreen();
+        createInstructionScreen(); // <--- DA THEM PHAN NAY KY LUONG
         
-        // Timer đếm giờ
+        cardLayout.show(mainPanel, "MENU"); 
+        
         gameTimer = new Timer(1000, e -> {
             seconds++;
             lblTime.setText("Thời gian: " + seconds + "s");
         });
 
-        // Timer úp bài tự động (0.8 giây)
         flipTimer = new Timer(800, e -> flipBack());
         flipTimer.setRepeats(false);
 
         setVisible(true);
     }
 
-    // ==========================================
-    // 1. MÀN HÌNH MENU (GIAO DIỆN CHÍNH)
-    // ==========================================
+    // --- 1. DOC FILE ---
+    private void loadHighScore() {
+        try {
+            File f = new File(FILE_NAME);
+            if (!f.exists()) {
+                f.createNewFile();
+                saveHighScore(0); 
+            } else {
+                BufferedReader br = new BufferedReader(new FileReader(f));
+                String line = br.readLine();
+                if (line != null && !line.isEmpty()) {
+                    highScore = Integer.parseInt(line.trim());
+                }
+                br.close();
+            }
+        } catch (Exception e) {
+            highScore = 0; 
+        }
+    }
+
+    // --- 2. GHI FILE ---
+    private void saveHighScore(int newScore) {
+        try {
+            BufferedWriter bw = new BufferedWriter(new FileWriter(FILE_NAME));
+            bw.write(String.valueOf(newScore));
+            bw.close();
+            highScore = newScore;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // --- GIAO DIEN MENU ---
     private void createMenuScreen() {
-        menuPanel = new JPanel();
+        menuPanel.removeAll();
         menuPanel.setLayout(new BoxLayout(menuPanel, BoxLayout.Y_AXIS));
-        menuPanel.setBackground(new Color(44, 62, 80)); // Màu xanh đậm hiện đại
+        menuPanel.setBackground(new Color(230, 240, 255)); // Xanh nhat
         menuPanel.setBorder(new EmptyBorder(50, 50, 50, 50));
 
-        // Tiêu đề
         JLabel title = new JLabel("MEMORY GAME");
         title.setFont(new Font("Arial", Font.BOLD, 40));
-        title.setForeground(Color.WHITE);
+        title.setForeground(new Color(0, 102, 204));
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        JLabel subTitle = new JLabel("Kỷ lục hiện tại: " + highScore + " điểm");
+        subTitle.setFont(new Font("Arial", Font.ITALIC, 20));
+        subTitle.setForeground(new Color(255, 102, 0));
+        subTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Các nút bấm
-        JButton btnEasy = createStyledButton("Chế Độ Dễ (4x4)");
-        JButton btnHard = createStyledButton("Chế Độ Khó (6x4)");
-        JButton btnInst = createStyledButton("Hướng Dẫn");
-        JButton btnExit = createStyledButton("Thoát Game");
+        // Tao nut
+        JButton btnEasy = createSimpleButton("Chế Độ Dễ (4x4)");
+        JButton btnHard = createSimpleButton("Chế Độ Khó (6x4)");
+        JButton btnInst = createSimpleButton("Hướng Dẫn");
+        JButton btnExit = createSimpleButton("Thoát Game");
 
-        // Xử lý sự kiện nút
+        // Gan su kien
         btnEasy.addActionListener(e -> startGame(4, 4));
         btnHard.addActionListener(e -> startGame(6, 4));
-        btnInst.addActionListener(e -> cardLayout.show(mainPanel, "INSTRUCT"));
+        
+        // SU KIEN MO HUONG DAN
+        btnInst.addActionListener(e -> {
+            createInstructionScreen(); // Ve lai huong dan
+            cardLayout.show(mainPanel, "INSTRUCT");
+        });
+        
         btnExit.addActionListener(e -> System.exit(0));
 
-        // Thêm vào panel
         menuPanel.add(Box.createVerticalGlue());
         menuPanel.add(title);
-        menuPanel.add(Box.createRigidArea(new Dimension(0, 40))); // Khoảng cách
+        menuPanel.add(subTitle);
+        menuPanel.add(Box.createRigidArea(new Dimension(0, 40)));
         menuPanel.add(btnEasy);
         menuPanel.add(Box.createRigidArea(new Dimension(0, 20)));
         menuPanel.add(btnHard);
@@ -112,10 +172,12 @@ public class GameM extends JFrame {
         menuPanel.add(Box.createRigidArea(new Dimension(0, 20)));
         menuPanel.add(btnExit);
         menuPanel.add(Box.createVerticalGlue());
+        
+        menuPanel.revalidate();
+        menuPanel.repaint();
     }
-
-    // Hàm tạo nút đẹp
-    private JButton createStyledButton(String text) {
+    
+    private JButton createSimpleButton(String text) {
         JButton btn = new JButton(text);
         btn.setFont(new Font("Arial", Font.BOLD, 18));
         btn.setMaximumSize(new Dimension(300, 50));
@@ -125,79 +187,103 @@ public class GameM extends JFrame {
         return btn;
     }
 
-    // ==========================================
-    // 2. MÀN HÌNH HƯỚNG DẪN
-    // ==========================================
+    // --- GIAO DIEN HUONG DAN (DA SUA) ---
     private void createInstructionScreen() {
-        instructPanel = new JPanel(new BorderLayout());
-        instructPanel.setBackground(new Color(236, 240, 241));
+        instructPanel.removeAll(); // Xoa trang truoc khi ve
+        instructPanel.setLayout(new BorderLayout());
+        instructPanel.setBackground(Color.WHITE);
 
+        // Noi dung huong dan
         JTextArea textArea = new JTextArea();
         textArea.setText(
-            "\n   HƯỚNG DẪN CHƠI GAME\n\n" +
-            "   1. Mục tiêu: Tìm tất cả các cặp hình giống nhau.\n" +
-            "   2. Cách chơi:\n" +
-            "      - Click vào một ô để lật hình lên.\n" +
-            "      - Click tiếp vào ô thứ hai.\n" +
-            "      - Nếu giống nhau: Bạn được tính điểm.\n" +
-            "      - Nếu khác nhau: Hình sẽ tự úp xuống sau 1 giây.\n\n" +
-            "   3. Chế độ chơi:\n" +
-            "      - Dễ: Bảng 4x4 (8 cặp hình).\n" +
-            "      - Khó: Bảng 6x4 (12 cặp hình).\n\n" +
-            "   Chúc bạn chơi vui vẻ!"
+            "\n   HƯỚNG DẪN & CÁCH TÍNH ĐIỂM:\n\n" +
+            "   1. Luật chơi cơ bản:\n" +
+            "      - Lật 2 ô hình giống nhau để ghi điểm.\n" +
+            "      - Nếu sai, hình sẽ úp lại sau 0.8 giây.\n\n" +
+            "   2. Hệ thống tính điểm:\n" +
+            "      ✅ Lật Đúng: +100 điểm/cặp.\n" +
+            "      ❌ Lật Sai:  -10 điểm/lần.\n\n" +
+            "   3. Thưởng Tốc Độ (Chỉ khi chiến thắng):\n" +
+            "      - Nếu bạn thắng dưới 60 giây:\n" +
+            "      - Điểm thưởng = (60 - Thời gian chơi) x 10.\n\n" +
+            "   4 Chúc bạn chơi vuii vẻ!! \n" +
+            "   >> Kỷ lục điểm cao nhất sẽ được lưu vào file trên Desktop.\n"
+             
         );
         textArea.setFont(new Font("Arial", Font.PLAIN, 18));
-        textArea.setEditable(false);
-        textArea.setBackground(new Color(236, 240, 241));
-        textArea.setMargin(new Insets(20, 40, 20, 40));
+        textArea.setEditable(false); // Khong cho sua chu
+        textArea.setMargin(new Insets(30, 50, 30, 50)); // Can le
+        textArea.setBackground(new Color(245, 245, 245)); // Nen xam nhat
 
+        // Nut quay lai
         JButton btnBack = new JButton("Quay Lại Menu");
         btnBack.setFont(new Font("Arial", Font.BOLD, 16));
-        btnBack.addActionListener(e -> cardLayout.show(mainPanel, "MENU"));
+        btnBack.setBackground(new Color(0, 102, 204));
+        btnBack.setForeground(Color.WHITE);
+        btnBack.addActionListener(e -> {
+            createMenuScreen(); // Cap nhat lai menu
+            cardLayout.show(mainPanel, "MENU");
+        });
+        
+        JPanel botPanel = new JPanel();
+        botPanel.setBackground(Color.WHITE);
+        botPanel.setBorder(new EmptyBorder(20,0,20,0));
+        botPanel.add(btnBack);
 
         instructPanel.add(textArea, BorderLayout.CENTER);
-        instructPanel.add(btnBack, BorderLayout.SOUTH);
+        instructPanel.add(botPanel, BorderLayout.SOUTH);
+        
+        instructPanel.revalidate();
+        instructPanel.repaint();
     }
 
-    // ==========================================
-    // 3. MÀN HÌNH GAMEPLAY (XỬ LÝ CHÍNH)
-    // ==========================================
+    // --- MAN HINH GAME ---
     private void startGame(int r, int c) {
         this.rows = r;
         this.cols = c;
+        this.currentScore = 0; 
         
-        // Tạo panel game mới mỗi lần chơi để reset sạch sẽ
-        gamePanel = new JPanel(new BorderLayout());
+        gamePanel.removeAll();
+        gamePanel.setLayout(new BorderLayout());
         
-        // --- Phần Top: Hiển thị thời gian và điểm ---
+        // Top
         JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.setBackground(new Color(50, 50, 50));
+        topPanel.setBackground(new Color(240, 240, 240));
         topPanel.setBorder(new EmptyBorder(10, 20, 10, 20));
 
         lblTime = new JLabel("Thời gian: 0s");
-        lblTime.setForeground(Color.WHITE);
         lblTime.setFont(new Font("Arial", Font.BOLD, 16));
 
-        lblScore = new JLabel("Lỗi: 0");
-        lblScore.setForeground(Color.CYAN);
-        lblScore.setFont(new Font("Arial", Font.BOLD, 16));
+        lblScore = new JLabel("Điểm: 0");
+        lblScore.setForeground(new Color(0, 153, 0));
+        lblScore.setFont(new Font("Arial", Font.BOLD, 18));
+        
+        lblHighScore = new JLabel("Top 1: " + highScore);
+        lblHighScore.setForeground(Color.RED);
+        lblHighScore.setFont(new Font("Arial", Font.BOLD, 16));
+
+        JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        infoPanel.setOpaque(false);
+        infoPanel.add(lblScore);
+        infoPanel.add(Box.createRigidArea(new Dimension(20, 0)));
+        infoPanel.add(lblHighScore);
 
         topPanel.add(lblTime, BorderLayout.WEST);
-        topPanel.add(lblScore, BorderLayout.EAST);
+        topPanel.add(infoPanel, BorderLayout.EAST);
 
-        // --- Phần Center: Bàn cờ ---
+        // Board
         boardPanel = new JPanel(new GridLayout(rows, cols, 5, 5));
         boardPanel.setBackground(Color.GRAY);
         boardPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        // Logic tạo dữ liệu
         setupGameData();
 
-        // --- Phần Bottom: Nút quay lại ---
+        // Bottom
         JButton btnBackMenu = new JButton("Quay Về Menu Chính");
         btnBackMenu.setFont(new Font("Arial", Font.BOLD, 14));
         btnBackMenu.addActionListener(e -> {
             gameTimer.stop();
+            createMenuScreen();
             cardLayout.show(mainPanel, "MENU");
         });
         
@@ -205,11 +291,10 @@ public class GameM extends JFrame {
         gamePanel.add(boardPanel, BorderLayout.CENTER);
         gamePanel.add(btnBackMenu, BorderLayout.SOUTH);
 
-        // Thêm vào card layout và hiển thị
-        mainPanel.add(gamePanel, "GAME");
+        gamePanel.revalidate();
+        gamePanel.repaint();
         cardLayout.show(mainPanel, "GAME");
         
-        // Bắt đầu đếm giờ
         gameTimer.restart();
     }
 
@@ -222,20 +307,18 @@ public class GameM extends JFrame {
         buttons = new JButton[totalCells];
         hiddenValues = new String[totalCells];
 
-        // Tạo danh sách cặp hình
         ArrayList<String> cards = new ArrayList<>();
         for (int i = 0; i < totalPairs; i++) {
             String icon = (i < icons.length) ? icons[i] : String.valueOf(i);
             cards.add(icon);
             cards.add(icon);
         }
-        Collections.shuffle(cards); // Xáo trộn
+        Collections.shuffle(cards); 
 
-        // Tạo nút
         for (int i = 0; i < totalCells; i++) {
             hiddenValues[i] = cards.get(i);
             buttons[i] = new JButton("");
-            buttons[i].setFont(new Font("Segoe UI Emoji", Font.BOLD, 32)); // Font Emoji cho đẹp
+            buttons[i].setFont(new Font("Segoe UI Emoji", Font.BOLD, 32)); 
             buttons[i].setBackground(new Color(220, 230, 241));
             buttons[i].setFocusPainted(false);
             
@@ -245,48 +328,45 @@ public class GameM extends JFrame {
         }
     }
 
-    // --- LOGIC XỬ LÝ CLICK ---
     private void onCardClick(int index) {
-        // Nếu đang chờ úp bài hoặc ô đã mở -> bỏ qua
         if (isProcessing || buttons[index].getText().length() > 0) return;
 
-        // Lật bài
         buttons[index].setText(hiddenValues[index]);
         buttons[index].setBackground(Color.WHITE);
 
         if (firstBtn == null) {
-            // Đây là thẻ thứ 1
             firstBtn = buttons[index];
             firstIndex = index;
         } else {
-            // Đây là thẻ thứ 2
             if (hiddenValues[firstIndex].equals(hiddenValues[index])) {
-                // ĐÚNG (Match)
-                firstBtn.setBackground(new Color(46, 204, 113)); // Xanh lá
-                buttons[index].setBackground(new Color(46, 204, 113));
-                // Vô hiệu hóa nút
+                // DUNG
+                firstBtn.setBackground(new Color(144, 238, 144)); 
+                buttons[index].setBackground(new Color(144, 238, 144));
                 firstBtn.setEnabled(false);
                 buttons[index].setEnabled(false);
                 
-                firstBtn = null; // Reset
+                currentScore += 100;
+                lblScore.setText("Điểm: " + currentScore);
+                
+                firstBtn = null; 
                 matchesFound++;
                 checkWin();
             } else {
-                // SAI (Mismatch)
-                firstBtn.setBackground(new Color(231, 76, 60)); // Đỏ
-                buttons[index].setBackground(new Color(231, 76, 60));
+                // SAI
+                firstBtn.setBackground(Color.PINK); 
+                buttons[index].setBackground(Color.PINK);
+                
+                if(currentScore >= 10) currentScore -= 10;
+                lblScore.setText("Điểm: " + currentScore);
                 
                 errors++;
-                lblScore.setText("Lỗi: " + errors);
-                
-                isProcessing = true; // Khóa bàn phím
-                flipTimer.start(); // Đợi 0.8s rồi úp lại
+                isProcessing = true; 
+                flipTimer.start(); 
             }
         }
     }
 
     private void flipBack() {
-        // Quét tìm các ô đang mở nhưng chưa hoàn thành để úp lại
         for (JButton btn : buttons) {
             if (btn.isEnabled() && btn.getText().length() > 0) {
                 btn.setText("");
@@ -294,21 +374,40 @@ public class GameM extends JFrame {
             }
         }
         firstBtn = null;
-        isProcessing = false; // Mở khóa
+        isProcessing = false; 
     }
 
     private void checkWin() {
         if (matchesFound == totalPairs) {
             gameTimer.stop();
-            JOptionPane.showMessageDialog(this, 
-                "CHIẾN THẮNG!\nThời gian: " + seconds + "s\nSai: " + errors + " lần.",
-                "Kết quả", JOptionPane.INFORMATION_MESSAGE);
-            cardLayout.show(mainPanel, "MENU"); // Về menu khi thắng
+            
+            int timeBonus = 0;
+            if (seconds < 60) {
+                timeBonus = (60 - seconds) * 10; 
+            }
+            int finalScore = currentScore + timeBonus;
+            
+            String msg = "Thời gian: " + seconds + "s\n" +
+                         "Điểm Gốc: " + currentScore + "\n" +
+                         "Thưởng Tốc Độ: " + timeBonus + "\n" +
+                         "---------------------\n" +
+                         "TỔNG ĐIỂM: " + finalScore;
+            
+            if (finalScore > highScore) {
+                saveHighScore(finalScore); 
+                msg += "\n\nCHÚC MỪNG! PHÁ KỶ LỤC MỚI!";
+            } else {
+                msg += "\n\nKỷ lục hiện tại: " + highScore;
+            }
+            
+            JOptionPane.showMessageDialog(this, msg, "KẾT QUẢ", JOptionPane.INFORMATION_MESSAGE);
+            
+            createMenuScreen();
+            cardLayout.show(mainPanel, "MENU"); 
         }
     }
 
     public static void main(String[] args) {
-        // Chạy trên luồng giao diện an toàn
         SwingUtilities.invokeLater(() -> new GameM());
     }
 }
